@@ -1,0 +1,5 @@
+Model,SR@5,SR@10,SR@20,AT
+CECR (full),0.952,0.992,0.992,1.83
+- PreRi (no pref. refine),0.948,0.992,0.992,1.91
+- CouRe (no counterfactual),0.932,0.984,0.984,2.08
+- RecPe (random decision),0.752,0.936,0.936,3.25

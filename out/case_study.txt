@@ -1,0 +1,14 @@
+User 29, target movie: 'George of the Jungle (1997)'  genres=["Children's", 'Comedy']
+
+Turn 1  System: Do you like 'Action' movies?
+Turn 2  User:   No, I don't like that.
+
+Turn 3  System: What about the movie 'Nightmare Before Christmas, The (1993)'? (genres: ["Children's", 'Comedy', 'Musical'])
+Turn 4  User:   No, I don't like this one.
+
+Counterfactual explanation for the rejection:
+  Most influential attribute: 'Children's'  (delta=1.000)
+  ES = 0.995, EC = 3
+
+Turn 5  System: What about the movie 'George of the Jungle (1997)'?
+Turn 6  User:   Yes, I like this movie, thanks!
