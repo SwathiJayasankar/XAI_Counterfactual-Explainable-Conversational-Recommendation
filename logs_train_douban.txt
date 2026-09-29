@@ -1,0 +1,4 @@
+dataset: douban_book  users=9432 items=21676 attrs=333  social=yes
+[Stage 1] GNN offline learning: 397704 positive interactions
+  [Stage 1] epoch 1/6  BPR loss = 0.4258  (375.6s)
+  [Stage 1] epoch 2/6  BPR loss = 0.3455  (375.1s)

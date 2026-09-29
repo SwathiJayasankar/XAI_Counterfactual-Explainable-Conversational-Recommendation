@@ -47,21 +47,27 @@ class GNNOfflineLearner:
         self.lr_w = lr * lr_w_scale     # weight matrices are updated far more often than
                                         # any single embedding row, so they need a smaller step
         d = dim
-        init = lambda *shape: rng.normal(0, 0.05, shape).astype(np.float32)
+        emb_init = lambda *shape: rng.normal(0, 0.05, shape).astype(np.float32)
+        # Xavier/Glorot-style init for weight matrices: std ~ 1/sqrt(fan_in).
+        # A fixed std=0.05 regardless of `dim` made layer outputs (and hence
+        # gradients) grow with dim, causing training to diverge at dim=128
+        # with the same learning rate that was stable at dim=32.
+        w_init = lambda fan_in, fan_out: (rng.normal(0, 1.0 / np.sqrt(fan_in), (fan_out, fan_in))
+                                           .astype(np.float32))
 
         # base (input) node embeddings e^(in)
-        self.e_u_in = init(n_users, d)
-        self.e_i_in = init(n_items, d)
+        self.e_u_in = emb_init(n_users, d)
+        self.e_i_in = emb_init(n_items, d)
 
         # Eq.1: rating-aware MLP,  input = [neighbor_emb(d) ; rating(1)] -> d
-        self.Wz, self.bz = init(d, d + 1), np.zeros(d, dtype=np.float32)
+        self.Wz, self.bz = w_init(d + 1, d), np.zeros(d, dtype=np.float32)
         # Eq.2/Eq.7: aggregation output layers (one per branch, both project agg(d) -> d)
-        self.WU, self.bU = init(d, d), np.zeros(d, dtype=np.float32)
-        self.WI, self.bI = init(d, d), np.zeros(d, dtype=np.float32)
+        self.WU, self.bU = w_init(d, d), np.zeros(d, dtype=np.float32)
+        self.WI, self.bI = w_init(d, d), np.zeros(d, dtype=np.float32)
         # Eq.6: one extra stacked layer on top of the user aggregation (depth=2 GNN)
-        self.W2, self.b2 = init(d, d), np.zeros(d, dtype=np.float32)
+        self.W2, self.b2 = w_init(d, d), np.zeros(d, dtype=np.float32)
         # attribute aggregation output layer
-        self.WA, self.bA = init(d, d), np.zeros(d, dtype=np.float32)
+        self.WA, self.bA = w_init(d, d), np.zeros(d, dtype=np.float32)
 
     # ---------- forward pieces ----------
     def _z(self, neighbor_embs, ratings):
@@ -196,14 +202,14 @@ def build_neighbor_lists(train_df, n_users, n_items, max_neighbors=30):
     return user_items, user_ratings, item_users, item_ratings
 
 
-def train_gnn(d, dim=32, epochs=12, n_triples_per_epoch=8000):
+def train_gnn(d, dim=32, epochs=12, n_triples_per_epoch=8000, lr=0.02, reg=1e-3):
     n_users, n_items, n_attrs = d["n_users"], d["n_items"], d["n_attrs"]
     train_df = d["train"]
     user_items, user_ratings, item_users, item_ratings = build_neighbor_lists(train_df, n_users, n_items)
     pos_by_user = train_df[train_df.rating >= 4].groupby("user")["item"].apply(list).to_dict()
     users_with_pos = np.array([u for u in pos_by_user if u in user_items and len(pos_by_user[u]) > 0])
 
-    gnn = GNNOfflineLearner(n_users, n_items, n_attrs, dim=dim, lr=0.02, reg=1e-3)
+    gnn = GNNOfflineLearner(n_users, n_items, n_attrs, dim=dim, lr=lr, reg=reg)
 
     for ep in range(epochs):
         idx = rng.choice(len(users_with_pos), size=n_triples_per_epoch)

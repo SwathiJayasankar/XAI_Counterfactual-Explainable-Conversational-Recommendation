@@ -1,0 +1,13 @@
+User 806, target movie: 'Sneakers (1992)'  genres=['Crime', 'Drama', 'Sci-Fi']
+
+Turn 1  User:   I'm looking for a 'Crime' movie.
+Turn 2  System: What about the movie 'Pulp Fiction (1994)'?  (genres: ['Crime', 'Drama'])
+Turn 3  User:   No, I don't like this one.
+
+  [Counterfactual explanation for the rejection]
+    Most influential attribute: 'Crime' (delta=-1.000)
+    Explanation strength ES = 0.249, complexity EC = 2 attribute(s)
+    -> "This was rejected mainly because of its 'Crime' attribute; a minimal change there would flip the decision."
+
+Turn 4  System: What about the movie 'Sneakers (1992)'?
+Turn 5  User:   Yes, I like this movie, thanks!

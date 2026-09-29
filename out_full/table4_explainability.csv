@@ -1,0 +1,3 @@
+Model,Precision,Recall,PN,PS
+Random,0.0526,0.1010,0.1541,0.2582
+CECR,0.7075,0.9980,0.8174,0.9493

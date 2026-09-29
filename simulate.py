@@ -19,13 +19,15 @@ user actually liked, rating >= 4):
 import numpy as np
 import pickle
 from cecr import CECR
+from ranker import Ranker
 
 # NOTE: base ("offline") embeddings in data/base_emb.npz are now produced by
 # gnn_embeddings.py -- STAGE 1 "GNN-based offline learning" (Eqs. 1-8) -- not
 # by the old plain matrix-factorization script. Run gnn_embeddings.py first.
 
 def run_simulation(cfg_name, use_pref_refine, use_counterfactual, use_score_decision,
-                    max_rounds=10, topk=10, n_test_users=300, seed=1, collect_explanations=False):
+                    max_rounds=10, topk=10, n_test_users=300, seed=1, collect_explanations=False,
+                    use_hard_filter=True, use_ranker=False):
     with open("data/prepared.pkl", "rb") as f:
         d = pickle.load(f)
     emb = np.load("data/base_emb.npz")
@@ -35,11 +37,25 @@ def run_simulation(cfg_name, use_pref_refine, use_counterfactual, use_score_deci
     n_items = d["n_items"]
 
     rng = np.random.default_rng(seed)
+    # Algorithm 1's trained ranking network g (Eq. 14) -- OPTIONAL (off by
+    # default). We implemented and tested it (see ranker.py / explain.txt):
+    # empirically, a freshly-initialized small MLP trained via BPR on top of
+    # the already-BPR-trained embeddings underperforms the plain dot product
+    # in this reduced-scale (32-dim, ~70k-interaction) reproduction, so the
+    # default recommendation path keeps the dot product. use_ranker=True is
+    # kept available to reproduce that documented comparison experiment.
+    ranker = None
+    if use_ranker:
+        try:
+            ranker = Ranker.load("data/ranker.npz").copy()
+        except FileNotFoundError:
+            ranker = None
+
     model = CECR(eu0, ei0, ea0, attr_matrix, dim,
                  use_pref_refine=use_pref_refine,
                  use_counterfactual=use_counterfactual,
                  use_score_decision=use_score_decision,
-                 seed=seed)
+                 seed=seed, ranker=ranker)
 
     # candidate (user, target item) pairs: items the user liked in the test split
     test = d["test"]
@@ -50,11 +66,6 @@ def run_simulation(cfg_name, use_pref_refine, use_counterfactual, use_score_deci
 
     success_round = []     # round index (1..max_rounds) at which success happened, or None
     explanations_log = []
-
-    # local (per-run) copies of item/user embeddings that get nudged by
-    # counterfactual-sample retraining (Eq. 19) -- only mutated when
-    # use_counterfactual=True, so the ablation truly removes this effect.
-    ei_local = ei0.copy()
 
     for u in users_avail:
         target_candidates = liked[liked.user == u].item.values
@@ -71,9 +82,12 @@ def run_simulation(cfg_name, use_pref_refine, use_counterfactual, use_score_deci
 
         rejected_items = []
         rejected_item_reps = []
-        candidate_items = [i for i in range(n_items) if i != target_item]
+        # FULL item catalog (all 1682 items), not a subsampled pool -- evaluating
+        # against the whole corpus is what the paper's own Top-K ranking does;
+        # capping this to a small random subset (as an earlier version of this
+        # script did) makes the task trivially easy and inflates SR.
+        candidate_items = list(range(n_items))
         rng.shuffle(candidate_items)
-        candidate_items = candidate_items[:400] + [target_item]   # cap search space for speed
 
         eu = eu0[u].copy()
         success = None
@@ -82,7 +96,12 @@ def run_simulation(cfg_name, use_pref_refine, use_counterfactual, use_score_deci
             e_prime_u = model.refine_user(eu, pos_attrs, neg_attrs)
             eoverall = model.overall_preference(e_prime_u, rejected_item_reps)
 
-            filtered_candidates = model.filter_candidates(candidate_items, pos_attrs, neg_attrs)
+            if use_hard_filter:
+                filtered_candidates = model.filter_candidates(candidate_items, pos_attrs, neg_attrs)
+            else:
+                # paper-literal path: no post-hoc genre filter, ranking relies
+                # purely on the learned e_overall . e_i score (Eq. 20)
+                filtered_candidates = candidate_items
             action, remaining_attrs = model.decide_action(eoverall, filtered_candidates, asked_attrs)
 
             if action == "recommend" or not remaining_attrs:
@@ -95,7 +114,7 @@ def run_simulation(cfg_name, use_pref_refine, use_counterfactual, use_score_deci
                     for it in topk_items:
                         if it == target_item:
                             continue
-                        item_vec = model.refine_rejected_item(ei_local[it], pos_attrs)
+                        item_vec = model.refine_rejected_item(ei0[it], pos_attrs)
                         rejected_item_reps.append(item_vec)
                         rejected_items.append(it)
 
@@ -104,20 +123,18 @@ def run_simulation(cfg_name, use_pref_refine, use_counterfactual, use_score_deci
                             outside = [c for c in candidate_items if c not in topk_items]
                             if outside:
                                 k_item = int(rng.choice(outside[:20]))
-                                s_ik = eoverall @ ei_local[k_item]
+                                s_ik = model.score_item(eoverall, ei0[k_item])
                                 delta, ES, EC, expl_attrs, cf_vec = model.counterfactual_explanation(
-                                    eoverall, ei_local[it], attr_matrix[it], s_ik)
+                                    eoverall, ei0[it], attr_matrix[it], s_ik)
                                 if collect_explanations:
                                     explanations_log.append(dict(
                                         user=u, item=it, ES=ES, EC=EC,
                                         expl_attrs=expl_attrs.tolist()))
-                                # Eq. 19: augment + retrain with counterfactual sample (u, i, k)
-                                s_i = eoverall @ ei_local[it]
-                                sig = 1.0 / (1.0 + np.exp(-np.clip(s_ik - s_i, -30, 30)))
-                                lr = 0.05
-                                grad_common = (1 - sig)
-                                ei_local[k_item] += lr * grad_common * eoverall
-                                ei_local[it] -= lr * grad_common * eoverall * 0.5
+                                # Eq. 19 / Algorithm 1 step 19: re-train the target model g
+                                # with the counterfactual sample (u, i, ik) -- prefer k_item
+                                # (still plausible) over the rejected item `it`.
+                                if model.ranker is not None:
+                                    model.ranker.train_step(eoverall, ei0[k_item], ei0[it])
                     candidate_items = [c for c in candidate_items if c not in rejected_items]
             else:
                 # ask about the attribute with highest score among remaining

@@ -11,19 +11,21 @@ N_TEST_USERS = 250
 MAX_ROUNDS = 10
 
 configs = [
-    # name,                pref_refine, counterfactual, score_decision
-    ("CECR (full)",         True,  True,  True),
-    ("- PreRi (no pref. refine)",  False, True,  True),
-    ("- CouRe (no counterfactual)", True,  False, True),
-    ("- RecPe (random decision)",   True,  True,  False),
+    # name,                pref_refine, counterfactual, score_decision, hard_filter
+    ("CECR (full)",         True,  True,  True,  True),
+    ("- PreRi (no pref. refine)",  False, True,  True,  True),
+    ("- CouRe (no counterfactual)", True,  False, True,  True),
+    ("- RecPe (random decision)",   True,  True,  False, True),
+    ("CECR (no hard filter, paper-literal)", True, True, True, False),
 ]
 
 results = {}
-for name, pr, cf, sd in configs:
+for name, pr, cf, sd, hf in configs:
     print(f"Running: {name} ...")
     res = run_simulation(name, pr, cf, sd, max_rounds=MAX_ROUNDS,
                           n_test_users=N_TEST_USERS, seed=7,
-                          collect_explanations=(name == "CECR (full)"))
+                          collect_explanations=(name == "CECR (full)"),
+                          use_hard_filter=hf)
     results[name] = res
     print("  ", res["sr_at_r"], "AT=", round(res["AT"], 2))
 
@@ -34,7 +36,7 @@ with open("out/results.pkl", "wb") as f:
 # RESULT 1  (reproduces paper's Fig. 3 - "SR at different rounds")
 # ---------------------------------------------------------------
 plt.figure(figsize=(6, 4.2))
-for name, _, _, _ in configs:
+for name, _, _, _, _ in configs:
     plt.plot(range(1, MAX_ROUNDS + 1), results[name]["sr_curve"], marker="o", label=name)
 plt.xlabel("Conversation round")
 plt.ylabel("Success Rate")
@@ -49,7 +51,7 @@ plt.close()
 # RESULT 2  (reproduces paper's Table II - "Recommendation performance")
 # ---------------------------------------------------------------
 table2_rows = []
-for name, _, _, _ in configs:
+for name, _, _, _, _ in configs:
     r = results[name]
     table2_rows.append([name, r["sr_at_r"]["SR@5"], r["sr_at_r"]["SR@10"],
                          r["sr_at_r"]["SR@20"], round(r["AT"], 2)])
@@ -61,7 +63,7 @@ with open("out/table2_performance.csv", "w") as f:
 # ---------------------------------------------------------------
 # RESULT 3  (reproduces paper's Fig. 4 - Ablation study, SR@20 + AT)
 # ---------------------------------------------------------------
-names = [c[0] for c in configs]
+names = [c[0] for c in configs[:4]]   # ablation chart excludes the separate filter-comparison config
 sr20 = [results[n]["sr_at_r"]["SR@20"] for n in names]
 ats = [results[n]["AT"] for n in names]
 
@@ -112,7 +114,7 @@ def explain_metrics(use_random_explanation, n_eval=150, K=10):
         eu = eu0[u]
         eoverall = model.refine_user(eu, user_pos_attrs, set())
 
-        pool = rng.choice([x for x in range(d["n_items"]) if x != i], size=300, replace=False).tolist()
+        pool = [x for x in range(d["n_items"]) if x != i]   # full catalog, not a 300-item subsample
         candidate_items = pool + [i]
         s_ik = np.sort(eoverall @ ei0[pool].T)[::-1][K - 1]   # score of the K-th ranked distractor
 
@@ -186,7 +188,7 @@ for lam in lambdas:
         i = int(rng2.choice(cand))
         user_pos_attrs = set(np.where(attr_matrix[i] > 0)[0].tolist())
         eoverall = model_lam.refine_user(eu0[u], user_pos_attrs, set())
-        pool = rng2.choice([x for x in range(d["n_items"]) if x != i], size=200, replace=False)
+        pool = np.array([x for x in range(d["n_items"]) if x != i])   # full catalog
         s_ik = np.sort(eoverall @ ei0[pool].T)[::-1][9]
         delta, ES, EC, expl_attrs, _ = model_lam.counterfactual_explanation(
             eoverall, ei0[i], attr_matrix[i], s_ik)

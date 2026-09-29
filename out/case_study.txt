@@ -8,7 +8,7 @@ Turn 4  User:   No, I don't like this one.
 
 Counterfactual explanation for the rejection:
   Most influential attribute: 'Children's'  (delta=1.000)
-  ES = 0.995, EC = 3
+  ES = 3.283, EC = 3
 
 Turn 5  System: What about the movie 'George of the Jungle (1997)'?
 Turn 6  User:   Yes, I like this movie, thanks!

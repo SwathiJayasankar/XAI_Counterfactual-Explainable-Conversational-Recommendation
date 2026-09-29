@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+data/_smoke*.pt
+data/prepared_douban.pkl

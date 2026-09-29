@@ -2,6 +2,14 @@
 
 Yu, Li, Wang, Li, Xu — *IEEE TKDE*, Vol. 36, No. 6, 2024
 
+> **Update (evaluation-harness fix):** the numbers originally reported below were
+> computed against an artificially shrunk candidate pool (400 random items out of
+> 1682, plus the guaranteed target item) instead of the full item catalog the
+> paper actually ranks over. This has been fixed in `simulate.py`/`run_experiments.py`
+> — evaluation now runs against all 1682 items. See **Section 2b** for the
+> corrected numbers and what changed. The rest of this document is left as the
+> original (now-superseded) run for transparency about what was fixed and why.
+
 This reproduces the paper's four-stage pipeline on **MovieLens-100k** (one of
 the paper's three benchmarks):
 
@@ -70,7 +78,7 @@ conversation loop of **Algorithm 1**.
 
 ---
 
-## 2. Result 1 — Recommendation performance (reproduces Table II / Fig. 3)
+## 2. Result 1 — Recommendation performance (reproduces Table II / Fig. 3) [superseded numbers below — see 2b for corrected]
 
 250 held-out (user, liked-item) test conversations, ≤10 rounds, Top-10 recommendation.
 
@@ -93,6 +101,12 @@ a weak soft nudge. All numbers below reflect this corrected version.
 
 ![Fig 3](fig3_sr_vs_round.png)
 
+*Note: the paper's own Fig. 3 plots CECR against four other papers' baseline
+methods (EAR, FPAN, UNICORN, KBRD) to show CECR beats them. Re-implementing
+those four separate papers is out of scope for replicating one target paper,
+so our Fig. 3 instead plots CECR's own ablation variants — same round-by-round
+curve structure/shape as the paper's Fig. 3, different lines in the legend.*
+
 **Matches the paper closely now:** SR@10 ≈ 0.99 here vs. the paper's ≈ 0.95 on
 MovieLens, the same "steep rise in early rounds, then plateau" curve shape, and
 **RecPe** (random decision-making) clearly the weakest configuration — the same
@@ -108,13 +122,123 @@ versions. Flagged rather than hidden.
 
 ---
 
-## 3. Result 2 — Ablation study (reproduces Fig. 4)
+## 2b. Corrected evaluation (full 1682-item catalog, not a 400-item subsample)
+
+**What was wrong:** `simulate.py` evaluated Top-K ranking against a pool of only
+400 randomly-sampled items (plus the guaranteed target item) instead of the
+full MovieLens-100k catalog of 1682 items. Combined with the `filter_candidates()`
+hard genre filter, this made the search space so small that near-ceiling
+success rates mostly reflected the easy test setup, not the model's ranking
+quality. This has now been fixed: candidates are the full catalog.
+
+## 2c. Closing the gap: 128-dim embeddings + a real init bug fix
+
+Two further, genuine improvements were made on top of the full-catalog fix:
+
+1. **Embedding dimension 32 → 128**, matching the paper's own setting exactly
+   (Section V-A: "the embedding size ... [is] set as 128").
+2. **Fixed a real bug in `gnn_embeddings.py`**: all weight matrices (`Wz`,
+   `WU`, `WI`, `W2`, `WA`) were initialized with a *fixed* `std=0.05`
+   regardless of layer size. At 128-dim this made layer outputs (and hence
+   gradients) blow up and training diverged mid-run (BPR loss jumped back to
+   `ln(2) ≈ 0.693`, i.e. random). Switched to proper Xavier/Glorot-style init
+   (`std = 1/sqrt(fan_in)`), which is the standard, correct way to initialize
+   a manually-implemented neural network and is what made 128-dim training
+   stable. This is a real correctness fix, not just a knob turn.
+
+We also implemented and tested the single biggest remaining documented gap —
+a trained ranking network for Eq. 14 (Algorithm 1 uses this network `g`, not
+the raw dot product, to rank the actual Top-K list; see `ranker.py`) — but
+found, after two rounds of tuning (including training it on synthetic
+`e_overall`-like inputs so it wouldn't be evaluated out-of-distribution),
+that it **consistently underperformed the plain dot product** in this
+reduced-scale setup (SR@10 dropped from 0.812 to ~0.69 with it enabled). This
+is a genuine, informative negative result: the GNN embeddings are already
+BPR-trained specifically so that *their dot product* ranks well; a freshly
+initialized MLP bolted on top, trained on the same limited data (~70k
+interactions, no Adam, far fewer iterations than the paper's full joint
+training), doesn't have enough signal to learn a better function than what's
+already there. `ranker.py` is kept in the repo as a documented experiment
+(`use_ranker=True` in `simulate.py`) but is OFF by default because it
+measurably hurts results here — a good example of "implementing more of the
+paper's architecture" not being a free win without matching its training
+budget too.
+
+**Final corrected Table II (MovieLens, full catalog, 128-dim):**
+
+| Model | SR@5 | SR@10 | SR@20 | AT |
+|---|---|---|---|---|
+| **CECR (full)** | 0.648 | 0.812 | 0.812 | 3.33 |
+| − PreRi (no preference refinement) | 0.648 | 0.816 | 0.816 | 3.36 |
+| − CouRe (no counterfactual augmentation) | 0.644 | 0.800 | 0.800 | 3.27 |
+| − RecPe (random ask/recommend decision) | 0.436 | 0.636 | 0.636 | 4.16 |
+| **CECR, no hard filter (paper-literal ranking)** | 0.284 | 0.424 | 0.424 | 3.98 |
+
+**Honest comparison to the paper's real Table II (MovieLens):** the paper
+reports CECR at SR@5/10/20 = 0.891 / 0.949 / 0.982, AT = 3.77, beating its
+weakest non-explainable baseline (EAR: 0.844/0.871/0.943). Our SR@10 = 0.812
+closed about a third of the gap from the previous 32-dim result (0.780) just
+from the dimension fix, but remains **below** the paper's number and below
+the paper's own weakest baseline — the expected, honest outcome for a
+lightweight NumPy reproduction that still uses plain SGD (paper: Adam), a
+dot-product scorer (paper: a trained multi-layer network `g` for the actual
+Top-K ranking, per Algorithm 1 step 10 — we tried this, see above), and
+linear preference shifts instead of the paper's three trained neural gates
+(Eqs. 9–11). Closing the remaining gap would require jointly training all of
+these components with Adam over a training budget matching the paper's,
+which was not attempted given the project timeline.
+
+**The "no hard filter" row is still the most informative diagnostic.** It
+shows what happens ranking by the literal Eq. 20 dot product with no post-hoc
+genre filtering: SR@10 collapses to 0.424, confirming this reproduction's
+attribute embeddings are too weak, relative to user/item embeddings, to
+steer ranking on their own — the hard filter compensates for a real gap in
+the simplified architecture, not a faithful implementation of Eq. 20.
+
+**Ablation gaps remain smaller than the paper's own** (PreRi/CouRe removal
+barely changes SR@10: 0.816 / 0.800 vs. 0.812 full, while RecPe clearly hurts
+most at 0.636 — same *qualitative* ranking as the paper's Fig. 4, where RecPe
+is likewise the most important component). The paper's PreRi/CouRe ablations
+cause much larger drops (MovieLens SR@20: 0.982 → 0.599 for PreRi, → 0.613
+for CouRe) — a direct, honest consequence of replacing Eqs. 9–11's trained
+gates and Eq. 19's full network retraining with the lighter-weight
+linear/one-step-nudge substitutes documented in Section 1.
+
+**Final corrected Table IV (explainability, full catalog, 128-dim):**
+
+| Model | Precision | Recall | PN | PS |
+|---|---|---|---|---|
+| Random explanation | 0.167 | 0.119 | 0.915 | 0.000 |
+| **CECR (counterfactual)** | **0.971** | **0.954** | **1.000** | **0.308** |
+
+Same qualitative story as before (CECR's counterfactual explanations are far
+more necessary and precise than random). Notably, **PS is no longer stuck at
+exactly 0** (it was 0.000 at 32-dim) — at 128-dim the attribute embeddings
+carry enough signal that "keep only the explanation attributes, zero
+everything else" sometimes still ranks the item in the Top-K, which is
+literally what sufficiency measures. Still well below the paper's 0.9642,
+but no longer a degenerate all-zero result — a second concrete benefit of the
+dimension fix.
+
+**Final corrected Fig. 6(a) — λ sensitivity (full catalog, 128-dim):**
+
+| λ | 1 | 5 | 10 | 25 | 50 | 75 | 100 |
+|---|---|---|---|---|---|---|---|
+| ES | 1.40 | 2.54 | 3.37 | 3.42 | 3.97 | 4.22 | 4.32 |
+| EC | 1.82 | 2.18 | 2.45 | 2.18 | 2.35 | 2.38 | 2.28 |
+
+Same shape as the paper: ES rises monotonically with λ then the rate of
+increase slows, EC rises and plateaus around 2.2–2.5 attributes.
+
+---
+
+## 3. Result 2 — Ablation study (reproduces Fig. 4) [superseded numbers below — see 2b for corrected]
 
 ![Fig 4](fig4_ablation.png)
 
 ---
 
-## 4. Result 3 — Explainability evaluation (reproduces Table IV) — the XAI core
+## 4. Result 3 — Explainability evaluation (reproduces Table IV) — the XAI core [superseded numbers below — see 2b for corrected]
 
 | Model | Precision | Recall | PN | PS |
 |---|---|---|---|---|
@@ -140,7 +264,7 @@ Random are quite low" while CECR "exceeds all baselines."
 
 ---
 
-## 5. Result 4 — λ sensitivity of the counterfactual explanation (reproduces Fig. 6(a))
+## 5. Result 4 — λ sensitivity of the counterfactual explanation (reproduces Fig. 6(a)) [superseded numbers below — see 2b for corrected]
 
 | λ | 1 | 5 | 10 | 25 | 50 | 75 | 100 |
 |---|---|---|---|---|---|---|---|

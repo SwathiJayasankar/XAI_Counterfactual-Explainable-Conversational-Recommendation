@@ -30,12 +30,20 @@ SIGMOID = lambda x: 1.0 / (1.0 + np.exp(-np.clip(x, -30, 30)))
 class CECR:
     def __init__(self, eu, ei, ea, attr_matrix, dim,
                  use_pref_refine=True, use_counterfactual=True, use_score_decision=True,
-                 eta=1.0, lr_cf=0.15, cf_iters=60, l2=0.05, l1=0.08, lam=6.0, seed=0):
+                 eta=1.0, lr_cf=0.15, cf_iters=60, l2=0.05, l1=0.08, lam=6.0, seed=0,
+                 ranker=None):
         # base (offline) representations - copies are refined per-conversation
         self.eu0, self.ei0, self.ea0 = eu, ei, ea
         self.attr_matrix = attr_matrix           # [n_items, n_attrs] binary
         self.dim = dim
         self.n_items, self.n_attrs = attr_matrix.shape
+
+        # Eq. 14 / Algorithm 1's trained ranking network g. When present, this
+        # (not the raw dot product) drives Top-K ranking and the counterfactual
+        # score s_u,i -- the dot product remains ONLY for the ask-vs-recommend
+        # decision (Eq. 20, decide_action), which the paper genuinely defines
+        # as a plain dot product.
+        self.ranker = ranker
 
         # ablation switches
         self.use_pref_refine = use_pref_refine
@@ -76,6 +84,12 @@ class CECR:
         e_neg_I = np.mean(rejected_item_reps, axis=0)
         return e_prime_u - e_neg_I
 
+    def score_item(self, eoverall, item_vec):
+        """s_u,i (Eq. 14): via the trained ranker g if present, else raw dot product."""
+        if self.ranker is not None:
+            return self.ranker.score(eoverall, item_vec)
+        return eoverall @ item_vec
+
     # ---------- Counterfactual reasoning (Eqs. 14-18): the XAI core ----------
     def counterfactual_explanation(self, eoverall, item_vec, item_attrs, s_ik):
         """
@@ -92,22 +106,31 @@ class CECR:
         # which is only meaningful for attributes a in item_attrs (Fig. 5's case study
         # explains rejection via one of the item's own genres, e.g. "Mystery").
         mask = (item_attrs > 0).astype(float)
-        s_orig = eoverall @ item_vec
+
+        def score(vec):
+            return self.score_item(eoverall, vec)
+
+        def score_and_grad(vec):
+            if self.ranker is not None:
+                return self.ranker.score_and_grad_wrt_item(eoverall, vec)
+            return eoverall @ vec, eoverall   # d(dot product)/d(vec) = eoverall
+
+        s_orig = score(item_vec)
 
         for t in range(self.cf_iters):
             item_delta_vec = item_vec - (delta * mask) @ self.ea0   # Eq: e_i + Delta (attribute-level)
-            s_delta = eoverall @ item_delta_vec
+            s_delta, d_s_d_vec = score_and_grad(item_delta_vec)
             # ranking (BPR-style) term of Eq. 17, gradient derived in closed form:
             # d/d(s_delta) [-log sigmoid(s_ik - s_delta)] = sigmoid(s_delta - s_ik)
             rank_grad_scalar = SIGMOID(s_delta - s_ik)
-            grad_score = -(self.ea0 @ eoverall) * mask               # d(s_delta)/d(delta)  -> [n_attrs]
+            grad_score = -(self.ea0 @ d_s_d_vec) * mask               # d(s_delta)/d(delta)  -> [n_attrs]
 
             grad = 2 * self.l2 * delta + self.l1 * np.sign(delta) + self.lam * rank_grad_scalar * grad_score
             delta = delta - self.lr_cf * grad
             delta = np.clip(delta, 0.0, 1.0) * mask
 
         item_delta_vec = item_vec - (delta * mask) @ self.ea0
-        s_delta_final = eoverall @ item_delta_vec
+        s_delta_final = score(item_delta_vec)
         ES = s_orig - s_delta_final                              # Eq. 15
         EC = np.sum(delta > 0.05)                                 # Eq. 16-17 complexity (support size)
         explanation_attrs = np.where(delta > 0.05)[0]
@@ -162,6 +185,12 @@ class CECR:
             return "ask", remaining_attrs
 
     def top_k(self, eoverall, candidate_items, k=10):
-        scores = eoverall @ self.ei0[candidate_items].T
+        """Algorithm 1, step 10: rank by the trained model g (Eq. 14) when
+        available, not the raw dot product (which Eq. 20 reserves for the
+        ask-vs-recommend decision only)."""
+        if self.ranker is not None:
+            scores = self.ranker.score_batch(eoverall, self.ei0[candidate_items])
+        else:
+            scores = eoverall @ self.ei0[candidate_items].T
         order = np.argsort(-scores)[:k]
         return [candidate_items[i] for i in order], scores[order]
