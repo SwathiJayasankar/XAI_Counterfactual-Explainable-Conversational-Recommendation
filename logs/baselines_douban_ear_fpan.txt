@@ -1,0 +1,28 @@
+dataset=douban users=9432 items=21676 attrs=333 test conversations=500 budget={'fm': 5, 'kg': 5, 'kbrd': 2000, 'gate_ep': 8, 'rl': 1000, 'dqn': 3000}
+[FM] attribute-aware FM (EAR estimation backbone)
+  [FM] epoch 1/5 loss=1.1378 (148.6s)
+  [FM] epoch 2/5 loss=0.8420 (169.3s)
+  [FM] epoch 3/5 loss=0.7173 (175.9s)
+  [FM] epoch 4/5 loss=0.6403 (162.8s)
+  [FM] epoch 5/5 loss=0.5888 (175.5s)
+[EAR] policy network: max-entropy pre-training + REINFORCE
+  [REINFORCE] ep 250/1000 train SR=0.876 (46s)
+  [REINFORCE] ep 500/1000 train SR=0.820 (90s)
+  [REINFORCE] ep 750/1000 train SR=0.820 (144s)
+  [REINFORCE] ep 1000/1000 train SR=0.816 (199s)
+  EAR      SR@5=0.618 SR@10=0.730 SR@20=0.788 AT=7.12  (23.8 ms/turn, 0.169 s/conv)
+[FPAN] gated online-feedback adaptation + EAR policy
+  [FPAN gates] epoch 1/8 loss=0.4484 (114.8s)
+  [FPAN gates] epoch 2/8 loss=0.4243 (109.8s)
+  [FPAN gates] epoch 3/8 loss=0.4138 (108.1s)
+  [FPAN gates] epoch 4/8 loss=0.4158 (108.8s)
+  [FPAN gates] epoch 5/8 loss=0.4109 (108.9s)
+  [FPAN gates] epoch 6/8 loss=0.4074 (111.3s)
+  [FPAN gates] epoch 7/8 loss=0.4021 (113.8s)
+  [FPAN gates] epoch 8/8 loss=0.4018 (105.2s)
+  [REINFORCE] ep 250/1000 train SR=0.804 (39s)
+  [REINFORCE] ep 500/1000 train SR=0.764 (82s)
+  [REINFORCE] ep 750/1000 train SR=0.760 (125s)
+  [REINFORCE] ep 1000/1000 train SR=0.720 (172s)
+  FPAN     SR@5=0.276 SR@10=0.526 SR@20=0.740 AT=11.30  (12.7 ms/turn, 0.144 s/conv)
+done in 2322s -> results/douban/

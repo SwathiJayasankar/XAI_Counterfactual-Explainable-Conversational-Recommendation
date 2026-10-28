@@ -1,0 +1,54 @@
+dataset=yelp users=4613 items=13915 attrs=245 test conversations=500 budget={'fm': 10, 'kg': 10, 'kbrd': 2000, 'gate_ep': 10, 'rl': 1000, 'dqn': 3000}
+[FM] attribute-aware FM (EAR estimation backbone)
+  [FM] epoch 1/10 loss=1.3672 (23.8s)
+  [FM] epoch 2/10 loss=0.9773 (32.9s)
+  [FM] epoch 3/10 loss=0.8075 (26.1s)
+  [FM] epoch 4/10 loss=0.7020 (27.6s)
+  [FM] epoch 5/10 loss=0.6364 (28.7s)
+  [FM] epoch 6/10 loss=0.5810 (30.6s)
+  [FM] epoch 7/10 loss=0.5327 (33.4s)
+  [FM] epoch 8/10 loss=0.5007 (32.3s)
+  [FM] epoch 9/10 loss=0.4774 (32.2s)
+  [FM] epoch 10/10 loss=0.4537 (29.9s)
+[KBRD] R-GCN knowledge-graph recommender
+  [KBRD] step 250/2000 CE=8.2103 (217s)
+  [KBRD] step 500/2000 CE=7.2233 (422s)
+  [KBRD] step 750/2000 CE=6.3846 (646s)
+  [KBRD] step 1000/2000 CE=5.8155 (850s)
+  [KBRD] step 1250/2000 CE=5.5824 (1055s)
+  [KBRD] step 1500/2000 CE=5.4658 (1249s)
+  [KBRD] step 1750/2000 CE=5.3615 (1442s)
+  [KBRD] step 2000/2000 CE=5.2828 (1644s)
+  tau=0.05: val SR@10=0.580 AT=9.72
+  tau=0.1: val SR@10=0.600 AT=8.86
+  tau=0.2: val SR@10=0.680 AT=7.80
+  tau=0.4: val SR@10=0.740 AT=7.96
+  tau=0.6: val SR@10=0.680 AT=8.53
+  tau=0.8: val SR@10=0.600 AT=9.85
+  chosen tau=0.2
+  KBRD     SR@5=0.466 SR@10=0.710 SR@20=0.960 AT=7.39  (11.4 ms/turn, 0.084 s/conv)
+[Table IV] explainable CRS baselines
+  CPR  {'Precision': 0.505, 'Recall': 0.548384126984127, 'PN': 0.999, 'PS': 0.768, 'n': 1000}
+  [CAEC] epoch 1/10 loss=0.6521 (75.6s)
+  [CAEC] epoch 2/10 loss=0.4955 (73.5s)
+  [CAEC] epoch 3/10 loss=0.4528 (73.7s)
+  [CAEC] epoch 4/10 loss=0.4314 (69.6s)
+  [CAEC] epoch 5/10 loss=0.4106 (61.0s)
+  [CAEC] epoch 6/10 loss=0.3936 (62.3s)
+  [CAEC] epoch 7/10 loss=0.3840 (59.6s)
+  [CAEC] epoch 8/10 loss=0.3647 (60.8s)
+  [CAEC] epoch 9/10 loss=0.3517 (54.1s)
+  [CAEC] epoch 10/10 loss=0.3401 (53.0s)
+  CAEC {'Precision': 0.5775, 'Recall': 0.40763333333333335, 'PN': 0.59, 'PS': 1.0, 'n': 1000}
+  [SAUR] epoch 1/10 loss=0.3582 (59.5s)
+  [SAUR] epoch 2/10 loss=0.3337 (59.4s)
+  [SAUR] epoch 3/10 loss=0.3155 (58.3s)
+  [SAUR] epoch 4/10 loss=0.3072 (57.9s)
+  [SAUR] epoch 5/10 loss=0.2958 (58.8s)
+  [SAUR] epoch 6/10 loss=0.2862 (58.4s)
+  [SAUR] epoch 7/10 loss=0.2808 (60.0s)
+  [SAUR] epoch 8/10 loss=0.2686 (60.4s)
+  [SAUR] epoch 9/10 loss=0.2600 (59.5s)
+  [SAUR] epoch 10/10 loss=0.2546 (59.8s)
+  SAUR {'Precision': 0.6394166666666667, 'Recall': 0.5276, 'PN': 0.94, 'PS': 0.743, 'n': 1000}
+done in 3302s -> results/yelp/

@@ -1,0 +1,19 @@
+dataset=douban users=9432 items=21676 attrs=333 test conversations=500 budget={'fm': 5, 'kg': 5, 'kbrd': 2000, 'gate_ep': 8, 'rl': 1000, 'dqn': 3000}
+[KBRD] R-GCN knowledge-graph recommender
+  [KBRD] step 250/2000 CE=9.0520 (287s)
+  [KBRD] step 500/2000 CE=7.3993 (597s)
+  [KBRD] step 750/2000 CE=6.3145 (909s)
+  [KBRD] step 1000/2000 CE=5.8329 (1210s)
+  [KBRD] step 1250/2000 CE=5.6748 (1499s)
+  [KBRD] step 1500/2000 CE=5.5864 (1788s)
+  [KBRD] step 1750/2000 CE=5.5126 (2074s)
+  [KBRD] step 2000/2000 CE=5.4828 (2330s)
+  tau=0.05: val SR@10=0.620 AT=8.98
+  tau=0.1: val SR@10=0.610 AT=9.35
+  tau=0.2: val SR@10=0.580 AT=10.14
+  tau=0.4: val SR@10=0.580 AT=10.06
+  tau=0.6: val SR@10=0.590 AT=10.29
+  tau=0.8: val SR@10=0.560 AT=10.79
+  chosen tau=0.05
+  KBRD     SR@5=0.568 SR@10=0.692 SR@20=0.788 AT=7.73  (13.1 ms/turn, 0.101 s/conv)
+done in 2481s -> results/douban/

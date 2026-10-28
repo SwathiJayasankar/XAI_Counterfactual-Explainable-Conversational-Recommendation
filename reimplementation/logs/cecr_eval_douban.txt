@@ -1,0 +1,17 @@
+[RQ1/RQ2] recommendation performance + ablations
+  CCR          SR@5=0.368 SR@10=0.502 SR@20=0.634 AT=11.04  (4.5 ms/turn)
+User 4334, target movie: 'item #186'  genres=['publisher:1475', 'year:37']
+
+Turn 1  User:   I'm looking for a 'publisher:1475' movie.
+Turn 2  System: What about the movie 'item #3'?  (genres: ['publisher:1475', 'year:13'])
+Turn 3  User:   No, I don't like this one.
+
+  [Counterfactual explanation for the rejection]
+    Most influential attribute: 'publisher:1475' (delta=-1.000)
+    Explanation strength ES = 1.379, complexity EC = 2 attribute(s)
+    -> "This was rejected mainly because of its 'publisher:1475' attribute; a minimal change there would flip the decision."
+
+Turn 4  System: What about the movie 'item #186'?
+Turn 5  User:   Yes, I like this movie, thanks!
+
+All outputs written to results/douban/

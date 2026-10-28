@@ -1,0 +1,63 @@
+[RQ1/RQ2] recommendation performance + ablations
+  CCR          SR@5=0.374 SR@10=0.502 SR@20=0.660 AT=10.99  (42.8 ms/turn)
+  - PreRi      SR@5=0.358 SR@10=0.476 SR@20=0.584 AT=11.67  (38.9 ms/turn)
+  - RecPe      SR@5=0.302 SR@10=0.408 SR@20=0.560 AT=12.67  (22.6 ms/turn)
+  - GNNs       SR@5=0.056 SR@10=0.192 SR@20=0.394 AT=16.31  (28.5 ms/turn)
+  - CouRe      SR@5=0.272 SR@10=0.440 SR@20=0.656 AT=12.10  (37.2 ms/turn)
+[RQ4] Top-K sweep (Fig. 6b/6c)
+  K= 1  AT=17.14  SR@20=0.250
+  K= 5  AT=13.22  SR@20=0.510
+  K=10  AT=10.99  SR@20=0.660
+  K=20  AT=8.70  SR@20=0.752
+  K=50  AT=5.92  SR@20=0.884
+[RQ3] explainability (Table IV)
+  CECR   {'Precision': 0.4378, 'Recall': 0.8105, 'PN': 0.9409, 'PS': 0.9449, 'n': 999}
+  Random {'Precision': 0.0042, 'Recall': 0.0042, 'PN': 0.058, 'PS': 0.066, 'n': 1000}
+[RQ4] lambda sensitivity (Fig. 6a)
+  lambda=   0  ES=0.0000  EC=0.00
+  lambda=   1  ES=0.9407  EC=1.10
+  lambda=   6  ES=3.2436  EC=2.12
+  lambda=  10  ES=3.6313  EC=2.40
+  lambda=  25  ES=4.7203  EC=2.48
+  lambda=  50  ES=5.7773  EC=2.58
+  lambda=  75  ES=6.2375  EC=2.58
+  lambda= 100  ES=6.4775  EC=2.58
+User 836, target movie: 'item #12094'  genres=['category:16', 'category:407', 'city:31']
+
+Turn 1  User:   I'm looking for a 'city:31' movie.
+Turn 2  System: What about the movie 'item #10003'?  (genres: ['category:247', 'city:31'])
+Turn 3  User:   No, I don't like this one.
+
+  [Counterfactual explanation for the rejection]
+    Most influential attribute: 'category:247' (delta=-1.000)
+    Explanation strength ES = 3.085, complexity EC = 2 attribute(s)
+    -> "This was rejected mainly because of its 'category:247' attribute; a minimal change there would flip the decision."
+
+Turn 4  System: What about the movie 'item #1050'?  (genres: ['category:306', 'category:407', 'city:31'])
+Turn 5  User:   No, I don't like this one.
+
+  [Counterfactual explanation for the rejection]
+    Most influential attribute: 'category:407' (delta=0.742)
+    Explanation strength ES = 5.950, complexity EC = 3 attribute(s)
+    -> "This was rejected mainly because of its 'category:407' attribute; a minimal change there would flip the decision."
+
+Turn 6  System: What about the movie 'item #552'?  (genres: ['category:407', 'category:76', 'city:31'])
+Turn 7  User:   No, I don't like this one.
+
+  [Counterfactual explanation for the rejection]
+    Most influential attribute: 'category:407' (delta=-0.838)
+    Explanation strength ES = 5.473, complexity EC = 3 attribute(s)
+    -> "This was rejected mainly because of its 'category:407' attribute; a minimal change there would flip the decision."
+
+Turn 8  System: What about the movie 'item #13884'?  (genres: ['category:306', 'category:407', 'city:31'])
+Turn 9  User:   No, I don't like this one.
+
+  [Counterfactual explanation for the rejection]
+    Most influential attribute: 'category:407' (delta=-0.795)
+    Explanation strength ES = 5.376, complexity EC = 3 attribute(s)
+    -> "This was rejected mainly because of its 'category:407' attribute; a minimal change there would flip the decision."
+
+Turn 10  System: What about the movie 'item #12094'?
+Turn 11  User:   Yes, I like this movie, thanks!
+
+All outputs written to results/yelp/

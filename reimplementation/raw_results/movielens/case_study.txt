@@ -1,0 +1,13 @@
+User 494, target movie: 'Star Trek: First Contact (1996)'  genres=['Action', 'Adventure', 'Sci-Fi']
+
+Turn 1  User:   I'm looking for a 'Sci-Fi' movie.
+Turn 2  System: What about the movie 'Back to the Future (1985)'?  (genres: ['Comedy', 'Sci-Fi'])
+Turn 3  User:   No, I don't like this one.
+
+  [Counterfactual explanation for the rejection]
+    Most influential attribute: 'Sci-Fi' (delta=-1.000)
+    Explanation strength ES = 0.631, complexity EC = 2 attribute(s)
+    -> "This was rejected mainly because of its 'Sci-Fi' attribute; a minimal change there would flip the decision."
+
+Turn 4  System: What about the movie 'Star Trek: First Contact (1996)'?
+Turn 5  User:   Yes, I like this movie, thanks!

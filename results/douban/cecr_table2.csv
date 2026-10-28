@@ -1,0 +1,2 @@
+Model,SR@5,SR@10,SR@20,AT,ms_per_turn,sec_per_conv
+CECR (CCR),0.3680,0.5020,0.6340,11.04,4.54,0.0501

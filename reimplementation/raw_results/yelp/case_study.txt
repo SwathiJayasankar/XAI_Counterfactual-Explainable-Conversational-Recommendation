@@ -1,0 +1,37 @@
+User 836, target movie: 'item #12094'  genres=['category:16', 'category:407', 'city:31']
+
+Turn 1  User:   I'm looking for a 'city:31' movie.
+Turn 2  System: What about the movie 'item #10003'?  (genres: ['category:247', 'city:31'])
+Turn 3  User:   No, I don't like this one.
+
+  [Counterfactual explanation for the rejection]
+    Most influential attribute: 'category:247' (delta=-1.000)
+    Explanation strength ES = 3.085, complexity EC = 2 attribute(s)
+    -> "This was rejected mainly because of its 'category:247' attribute; a minimal change there would flip the decision."
+
+Turn 4  System: What about the movie 'item #1050'?  (genres: ['category:306', 'category:407', 'city:31'])
+Turn 5  User:   No, I don't like this one.
+
+  [Counterfactual explanation for the rejection]
+    Most influential attribute: 'category:407' (delta=0.742)
+    Explanation strength ES = 5.950, complexity EC = 3 attribute(s)
+    -> "This was rejected mainly because of its 'category:407' attribute; a minimal change there would flip the decision."
+
+Turn 6  System: What about the movie 'item #552'?  (genres: ['category:407', 'category:76', 'city:31'])
+Turn 7  User:   No, I don't like this one.
+
+  [Counterfactual explanation for the rejection]
+    Most influential attribute: 'category:407' (delta=-0.838)
+    Explanation strength ES = 5.473, complexity EC = 3 attribute(s)
+    -> "This was rejected mainly because of its 'category:407' attribute; a minimal change there would flip the decision."
+
+Turn 8  System: What about the movie 'item #13884'?  (genres: ['category:306', 'category:407', 'city:31'])
+Turn 9  User:   No, I don't like this one.
+
+  [Counterfactual explanation for the rejection]
+    Most influential attribute: 'category:407' (delta=-0.795)
+    Explanation strength ES = 5.376, complexity EC = 3 attribute(s)
+    -> "This was rejected mainly because of its 'category:407' attribute; a minimal change there would flip the decision."
+
+Turn 10  System: What about the movie 'item #12094'?
+Turn 11  User:   Yes, I like this movie, thanks!

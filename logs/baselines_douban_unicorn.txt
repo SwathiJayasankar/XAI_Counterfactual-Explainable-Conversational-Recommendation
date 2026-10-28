@@ -1,0 +1,21 @@
+dataset=douban users=9432 items=21676 attrs=333 test conversations=500 budget={'fm': 5, 'kg': 5, 'kbrd': 2000, 'gate_ep': 8, 'rl': 1000, 'dqn': 3000}
+[UNICORN] TransE graph pre-training + graph-based dueling double DQN
+  [TransE+pref] epoch 1/5 loss=1.1985 (108.7s)
+  [TransE+pref] epoch 2/5 loss=0.7955 (124.2s)
+  [TransE+pref] epoch 3/5 loss=0.6519 (119.3s)
+  [TransE+pref] epoch 4/5 loss=0.5551 (118.3s)
+  [TransE+pref] epoch 5/5 loss=0.4931 (113.3s)
+  [DQN] ep 250/3000 train SR=0.688 eps=0.44 (631s)
+  [DQN] ep 500/3000 train SR=0.708 eps=0.38 (1125s)
+  [DQN] ep 750/3000 train SR=0.732 eps=0.32 (1625s)
+  [DQN] ep 1000/3000 train SR=0.696 eps=0.26 (1988s)
+  [DQN] ep 1250/3000 train SR=0.644 eps=0.20 (2309s)
+  [DQN] ep 1500/3000 train SR=0.716 eps=0.14 (2597s)
+  [DQN] ep 1750/3000 train SR=0.748 eps=0.08 (2858s)
+  [DQN] ep 2000/3000 train SR=0.700 eps=0.05 (3142s)
+  [DQN] ep 2250/3000 train SR=0.732 eps=0.05 (5752s)
+  [DQN] ep 2500/3000 train SR=0.668 eps=0.05 (6060s)
+  [DQN] ep 2750/3000 train SR=0.692 eps=0.05 (6371s)
+  [DQN] ep 3000/3000 train SR=0.748 eps=0.05 (6618s)
+  UNICORN  SR@5=0.218 SR@10=0.464 SR@20=0.694 AT=12.18  (7.2 ms/turn, 0.087 s/conv)
+done in 7252s -> results/douban/

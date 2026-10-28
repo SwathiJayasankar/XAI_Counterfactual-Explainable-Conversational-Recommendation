@@ -1,0 +1,63 @@
+dataset: yelp  users=4613 items=13915 attrs=245  social=yes
+[Stage 1] GNN offline learning: 78291 positive interactions
+  [Stage 1] epoch 1/10  BPR loss = 0.4388  (76.6s)
+  [Stage 1] epoch 2/10  BPR loss = 0.3267  (83.1s)
+  [Stage 1] epoch 3/10  BPR loss = 0.3117  (83.7s)
+  [Stage 1] epoch 4/10  BPR loss = 0.3020  (80.8s)
+  [Stage 1] epoch 5/10  BPR loss = 0.2965  (82.7s)
+  [Stage 1] epoch 6/10  BPR loss = 0.2851  (84.2s)
+  [Stage 1] epoch 7/10  BPR loss = 0.2777  (83.8s)
+  [Stage 1] epoch 8/10  BPR loss = 0.2698  (82.0s)
+  [Stage 1] epoch 9/10  BPR loss = 0.2616  (88.7s)
+  [Stage 1] epoch 10/10  BPR loss = 0.2579  (82.2s)
+[Stage 2] conversational training: gates + ranking net g (counterfactual augmentation ON)
+  [Stage 2] epoch 1/20  loss = 0.4248  cf_samples = 5  (30.8s)
+  [Stage 2] epoch 2/20  loss = 0.3596  cf_samples = 3  (31.7s)
+  [Stage 2] epoch 3/20  loss = 0.3364  cf_samples = 3  (29.1s)
+  [Stage 2] epoch 4/20  loss = 0.3308  cf_samples = 3  (38.7s)
+  [Stage 2] epoch 5/20  loss = 0.3179  cf_samples = 2  (37.4s)  val SR@10 = 0.567
+  [Stage 2] epoch 6/20  loss = 0.3041  cf_samples = 3  (34.1s)
+  [Stage 2] epoch 7/20  loss = 0.3010  cf_samples = 2  (34.3s)
+  [Stage 2] epoch 8/20  loss = 0.2912  cf_samples = 1  (35.0s)
+  [Stage 2] epoch 9/20  loss = 0.2820  cf_samples = 2  (33.8s)
+  [Stage 2] epoch 10/20  loss = 0.2849  cf_samples = 2  (34.3s)  val SR@10 = 0.533
+  [Stage 2] epoch 11/20  loss = 0.2839  cf_samples = 3  (32.8s)
+  [Stage 2] epoch 12/20  loss = 0.2844  cf_samples = 5  (32.5s)
+  [Stage 2] epoch 13/20  loss = 0.2687  cf_samples = 4  (31.7s)
+  [Stage 2] epoch 14/20  loss = 0.2591  cf_samples = 2  (32.5s)
+  [Stage 2] epoch 15/20  loss = 0.2555  cf_samples = 2  (31.5s)  val SR@10 = 0.517
+  [Stage 2] epoch 16/20  loss = 0.2527  cf_samples = 3  (32.1s)
+  [Stage 2] epoch 17/20  loss = 0.2441  cf_samples = 2  (36.1s)
+  [Stage 2] epoch 18/20  loss = 0.2392  cf_samples = 3  (39.7s)
+  [Stage 2] epoch 19/20  loss = 0.2427  cf_samples = 4  (39.2s)
+  [Stage 2] epoch 20/20  loss = 0.2356  cf_samples = 3  (39.8s)  val SR@10 = 0.600
+saved data/cecr_yelp_full.pt   total 1544.9s
+dataset: yelp  users=4613 items=13915 attrs=245  social=yes
+[Stage 1] reused GNN weights from data/cecr_yelp_full.pt; gates + ranking net reinitialised
+[Stage 2] conversational training: gates + ranking net g (counterfactual augmentation OFF)
+  [Stage 2] epoch 1/20  loss = 0.3993  cf_samples = 0  (36.1s)
+  [Stage 2] epoch 2/20  loss = 0.3312  cf_samples = 0  (36.0s)
+  [Stage 2] epoch 3/20  loss = 0.3214  cf_samples = 0  (37.5s)
+  [Stage 2] epoch 4/20  loss = 0.3081  cf_samples = 0  (36.1s)
+  [Stage 2] epoch 5/20  loss = 0.3001  cf_samples = 0  (35.1s)  val SR@10 = 0.500
+  [Stage 2] epoch 6/20  loss = 0.2926  cf_samples = 0  (35.5s)
+  [Stage 2] epoch 7/20  loss = 0.2892  cf_samples = 0  (36.7s)
+  [Stage 2] epoch 8/20  loss = 0.2798  cf_samples = 0  (34.5s)
+  [Stage 2] epoch 9/20  loss = 0.2727  cf_samples = 0  (3045.5s)
+  [Stage 2] epoch 10/20  loss = 0.2652  cf_samples = 0  (34.8s)  val SR@10 = 0.533
+  [Stage 2] epoch 11/20  loss = 0.2597  cf_samples = 0  (30.7s)
+  [Stage 2] epoch 12/20  loss = 0.2546  cf_samples = 0  (31.8s)
+  [Stage 2] epoch 13/20  loss = 0.2471  cf_samples = 0  (31.7s)
+  [Stage 2] epoch 14/20  loss = 0.2382  cf_samples = 0  (31.1s)
+  [Stage 2] epoch 15/20  loss = 0.2336  cf_samples = 0  (31.4s)  val SR@10 = 0.433
+  [Stage 2] epoch 16/20  loss = 0.2235  cf_samples = 0  (27.9s)
+  [Stage 2] epoch 17/20  loss = 0.2192  cf_samples = 0  (33.0s)
+  [Stage 2] epoch 18/20  loss = 0.2134  cf_samples = 0  (29.3s)
+  [Stage 2] epoch 19/20  loss = 0.2037  cf_samples = 0  (28.6s)
+  [Stage 2] epoch 20/20  loss = 0.2012  cf_samples = 0  (26.9s)  val SR@10 = 0.483
+saved data/cecr_yelp_nocf.pt   total 3697.4s
+dataset: douban_book  users=9432 items=21676 attrs=333  social=yes
+[Stage 1] GNN offline learning: 397704 positive interactions
+  [Stage 1] epoch 1/5  BPR loss = 0.4258  (473.1s)
+  [Stage 1] epoch 2/5  BPR loss = 0.3455  (525.5s)
+  [Stage 1] epoch 3/5  BPR loss = 0.3102  (545.4s)

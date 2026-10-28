@@ -1,15 +1,18 @@
 """
 Evaluation of the faithful CECR replica -> every table/figure the paper reports
-for MovieLens, written to out_full/.
+for CECR on one dataset, written to results/<dataset>/.
 
   RQ1  Table II  + Fig. 3   recommendation performance (SR@5/10/20, AT)
   RQ2  Fig. 4               ablation study (GNNs / PreRi / CouRe / RecPe / CCR)
   RQ3  Table IV             explainability (Precision, Recall, PN, PS)
        Fig. 5               qualitative case study
   RQ4  Fig. 6(a)            lambda sensitivity (ES vs EC)
+       Fig. 6(b)(c)         Top-K sensitivity (AT, SR@20)
+  RQ5  Fig. 6(d)            response time (ms per turn, s per conversation)
 
-SR@20 requires conversations of up to 20 rounds -- the earlier NumPy pipeline
-capped at 10, which silently made SR@10 and SR@20 identical in every table.
+Performance and explainability run through crs_bench.py, the harness every
+baseline (run_baselines.py) uses, so the comparison is on identical
+conversations. SR@20 requires conversations of up to 20 rounds.
 """
 import argparse
 import os
@@ -19,9 +22,12 @@ import numpy as np
 import torch
 
 from cecr_torch import (CECRModel, UserSimulator, build_graph_tensors,
-                        candidate_set, counterfactual_explanation, run_conversation)
+                        candidate_set, counterfactual_explanation)
+from crs_bench import (CECRAgent, evaluate, explanation_states, liked_attr_profile,
+                       test_pairs as make_test_pairs)
+from crs_bench import eval_explainability as bench_explainability
 
-OUT = "out_full"
+OUT = "results/movielens"
 MAX_ROUNDS = 20
 TOPK = 10
 
@@ -31,7 +37,13 @@ def load_model(path, d):
     m = CECRModel(d["n_users"], d["n_items"], d["n_attrs"],
                   dim=ck["dim"], gate_sign=ck.get("gate_sign", 1),
                   use_social=ck.get("use_social", False))
-    m.load_state_dict(ck["model"])
+    # strict=False so checkpoints trained before the social branch (Eqs. 4-5)
+    # existed still load; those weights are unused when use_social is False.
+    missing, unexpected = m.load_state_dict(ck["model"], strict=False)
+    if unexpected:
+        raise RuntimeError(f"unexpected keys in checkpoint: {list(unexpected)}")
+    if missing and not all(("att_s" in k or "W_S" in k) for k in missing):
+        raise RuntimeError(f"checkpoint is missing non-social weights: {list(missing)}")
     m.eval()
     return m
 
@@ -47,134 +59,25 @@ def embeddings(model, graph, variant="full"):
 
 
 # --------------------------------------------------------------------------
+# RQ1 / RQ2 / RQ3 run through the shared harness (crs_bench.py), i.e. the very
+# same conversation loop, test pairs and Table IV states as every baseline.
 def eval_performance(model, d, attr_matrix, e_u, e_i, e_a, test_pairs, seed=7,
-                     use_pref_refine=True, use_score_decision=True):
-    sim = UserSimulator(attr_matrix)
-    rng = np.random.default_rng(seed)
-    rounds = []
-    for u, tgt in test_pairs:
-        r, _ = run_conversation(model, u, tgt, sim, attr_matrix, e_u, e_i, e_a,
-                                max_rounds=MAX_ROUNDS, topk=TOPK, rng=rng,
-                                use_pref_refine=use_pref_refine,
-                                use_score_decision=use_score_decision)
-        rounds.append(r)
-    out = {}
-    for r in (5, 10, 20):
-        out[f"SR@{r}"] = float(np.mean([1 if (x is not None and x <= r) else 0 for x in rounds]))
-    done = [x for x in rounds if x is not None]
-    # AT: unsuccessful conversations count as the full budget (standard CRS convention)
-    out["AT"] = float(np.mean([x if x is not None else MAX_ROUNDS for x in rounds]))
-    out["curve"] = [float(np.mean([1 if (x is not None and x <= r) else 0 for x in rounds]))
-                    for r in range(1, MAX_ROUNDS + 1)]
-    out["n"] = len(rounds)
-    return out
+                     use_pref_refine=True, use_score_decision=True, topk=TOPK):
+    agent = CECRAgent(model, e_u, e_i, e_a, attr_matrix,
+                      use_pref_refine=use_pref_refine,
+                      use_score_decision=use_score_decision)
+    return evaluate(agent, test_pairs, attr_matrix, seed=seed,
+                    max_rounds=MAX_ROUNDS, topk=topk)
 
 
-# --------------------------------------------------------------------------
-def eval_explainability(model, d, attr_matrix, e_u, e_i, e_a, test_pairs,
-                        lam=100.0, cf_iters=60, seed=7, random_expl=False, n_users=100):
-    """
-    Eq. 21 (Precision/Recall) and Eq. 22 (PN/PS), evaluated over the actual
-    Top-K recommendation list R_{u,K} exactly as the paper defines them.
-
-    Non-circular by construction: the "user's liked attributes" are the ones
-    the simulated user actually confirmed during the conversation, not simply
-    all attributes of the target item.
-    """
-    sim = UserSimulator(attr_matrix)
-    rng = np.random.default_rng(seed)
-    n_items, n_attrs = attr_matrix.shape
-    P, R, PN, PS = [], [], [], []
-
-    for u, tgt in test_pairs[:n_users]:
-        t_attrs = sim.attrs_of(tgt)
-        if not t_attrs:
-            continue
-        # --- replay a short conversation to obtain a realistic state ---
-        first = int(rng.choice(sorted(t_attrs)))
-        pos_attrs, neg_attrs, asked = {first}, set(), {first}
-        for _ in range(2):
-            cands = candidate_set(attr_matrix, pos_attrs, neg_attrs, [], n_items)
-            if len(cands) == 0:
-                break
-            with torch.no_grad():
-                eo = model.overall(e_u[u], pos_attrs, neg_attrs, [], e_a, e_i)
-            present = np.nonzero(attr_matrix[cands].sum(0) > 0)[0]
-            ca = [int(a) for a in present if a not in asked]
-            if not ca:
-                break
-            with torch.no_grad():
-                a_star = int(ca[int(torch.argmax(e_a[ca] @ eo))])
-            asked.add(a_star)
-            (pos_attrs if a_star in t_attrs else neg_attrs).add(a_star)
-
-        cands = candidate_set(attr_matrix, pos_attrs, neg_attrs, [], n_items)
-        if len(cands) <= TOPK:
-            continue
-        with torch.no_grad():
-            eo = model.overall(e_u[u], pos_attrs, neg_attrs, [], e_a, e_i)
-            scores = model.rank(eo, e_i[cands])
-            order = torch.topk(scores, min(TOPK, len(cands))).indices.cpu().numpy()
-            topk_items = cands[order]
-            kth = float(scores[order[-1]])
-            s_ik = torch.as_tensor(kth)
-
-        for it in topk_items:
-            it = int(it)
-            i_attrs = np.nonzero(attr_matrix[it])[0]
-            if len(i_attrs) == 0:
-                continue
-            if random_expl:
-                # Paper's baseline: "Random: randomly selects some aspects as
-                # explanations" -- aspects are drawn from the whole attribute
-                # set A, NOT from the item's own attributes (drawing from the
-                # item's own genres would leak the answer and inflate this
-                # baseline far above the paper's reported 0.33% precision).
-                k = int(rng.integers(1, 4))
-                expl = rng.choice(n_attrs, size=k, replace=False)
-            else:
-                _, ES, EC, expl, _ = counterfactual_explanation(
-                    model, eo, e_i[it], torch.as_tensor(attr_matrix[it]),
-                    e_a, s_ik, lam=lam, iters=cf_iters)
-                if len(expl) == 0:
-                    continue
-
-            # ---- Eq. 21 ----
-            liked = pos_attrs & set(i_attrs.tolist())
-            ind = np.zeros(n_attrs); ind[np.asarray(expl, dtype=int)] = 1
-            p = np.zeros(n_attrs)
-            for a in liked:
-                p[a] = 1
-            num = float((p * ind).sum())
-            P.append(num / max(ind.sum(), 1))
-            R.append(num / max(p.sum(), 1e-9) if p.sum() > 0 else 0.0)
-
-            # ---- Eq. 22 ----
-            # "We set the attribute value of all items to 0 if they are in A_ui":
-            # zeroing an attribute the item does NOT carry is a no-op, so only
-            # the explanation attributes the item actually has may be removed.
-            # (Without this guard a random explanation perturbs the item by
-            # attributes it never had, which inflates its PN enormously.)
-            expl_owned = [int(a) for a in np.asarray(expl, dtype=int)
-                          if attr_matrix[it, int(a)] > 0]
-            with torch.no_grad():
-                # PN: zero the explanation attributes -> item should LEAVE Top-K
-                i_star = e_i[it] - (e_a[torch.as_tensor(expl_owned, dtype=torch.long)].sum(0)
-                                    if expl_owned else 0.0)
-                PN.append(1.0 if float(model.rank(eo, i_star)) < kth else 0.0)
-                # PS: keep ONLY the explanation attributes -> item should STAY
-                # (standard sufficiency convention of the paper's own ref. [47];
-                #  the paper's printed Eq. 22 repeats PN's condition verbatim,
-                #  which is self-contradictory -- documented in explain.txt)
-                others = [a for a in i_attrs if a not in set(np.asarray(expl).tolist())]
-                i_circ = e_i[it] - (e_a[torch.as_tensor(others, dtype=torch.long)].sum(0)
-                                    if others else 0.0)
-                PS.append(1.0 if float(model.rank(eo, i_circ)) >= kth else 0.0)
-
-    return dict(Precision=float(np.mean(P)) if P else 0.0,
-                Recall=float(np.mean(R)) if R else 0.0,
-                PN=float(np.mean(PN)) if PN else 0.0,
-                PS=float(np.mean(PS)) if PS else 0.0, n=len(P))
+def eval_explainability(model, d, attr_matrix, e_u, e_i, e_a, states, profile,
+                        lam=100.0, random_expl=False):
+    """Eq. 21 (Precision/Recall) and Eq. 22 (PN/PS); see crs_bench for the
+    protocol. `Random` explains with random attributes against CECR's ranker."""
+    agent = CECRAgent(model, e_u, e_i, e_a, attr_matrix)
+    agent.explain = lambda st, item, kth: CECRAgent.explain(agent, st, item, kth, lam=lam)
+    return bench_explainability(agent, states, attr_matrix, profile,
+                                rng=np.random.default_rng(7), random_expl=random_expl)
 
 
 # --------------------------------------------------------------------------
@@ -293,117 +196,123 @@ def case_study(model, d, attr_matrix, e_u, e_i, e_a, test_pairs, titles, genres,
 
 
 # --------------------------------------------------------------------------
+def show(name, r):
+    print(f"  {name:12s} SR@5={r['SR@5']:.3f} SR@10={r['SR@10']:.3f} "
+          f"SR@20={r['SR@20']:.3f} AT={r['AT']:.2f}  ({r['ms_per_turn']:.1f} ms/turn)",
+          flush=True)
+
+
 def main():
     global OUT
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="data/cecr_full.pt")
     ap.add_argument("--model-noucf", default="data/cecr_nocf.pt",
                     help="separately trained model for the CouRe ablation")
-    ap.add_argument("--n-test", type=int, default=250)
+    ap.add_argument("--n-test", type=int, default=500)
+    ap.add_argument("--n-expl", type=int, default=100)
     ap.add_argument("--lam", type=float, default=100.0)
     ap.add_argument("--data", default="data/prepared.pkl")
-    ap.add_argument("--out", default=None)
+    ap.add_argument("--out", default="results/movielens")
     ap.add_argument("--skip-expl", action="store_true",
-                    help="skip Table IV (the paper publishes it only for "
-                         "MovieLens and Yelp, so Douban-Book has no reference)")
+                    help="skip Table IV (published for MovieLens and Yelp only)")
     ap.add_argument("--skip-lambda", action="store_true", help="skip Fig. 6(a)")
     ap.add_argument("--skip-ablations", action="store_true",
-                    help="evaluate only the full model (paper's Fig. 4 ablations "
-                         "are published for MovieLens/Yelp only)")
+                    help="evaluate only the full model (Fig. 4 is MovieLens/Yelp only)")
+    ap.add_argument("--topk-sweep", action="store_true",
+                    help="Fig. 6(b)(c): AT and SR@20 for Top-K in {1,5,10,20,50}")
     args = ap.parse_args()
 
-    if args.out:
-        OUT = args.out
+    OUT = args.out
     os.makedirs(OUT, exist_ok=True)
     with open(args.data, "rb") as f:
         d = pickle.load(f)
     attr_matrix = d["attr_matrix"]
     graph = build_graph_tensors(d)
     model = load_model(args.model, d)
-
-    test = d["test"]
-    liked = test[test.rating >= 4]
-    rng = np.random.default_rng(7)
-    arr = liked[["user", "item"]].values
-    sel = rng.choice(len(arr), min(args.n_test, len(arr)), replace=False)
-    test_pairs = [(int(u), int(i)) for u, i in arr[sel]]
-
+    test_pairs = make_test_pairs(d, args.n_test)
     e_u, e_i, e_a = embeddings(model, graph)
+    out = dict(results={}, expl={}, lam=[], topk=[])
 
-    # ---------------- RQ1 / RQ2 ----------------
-    print("[RQ1/RQ2] recommendation performance + ablations")
-    results = {}
-    results["CECR (CCR)"] = eval_performance(model, d, attr_matrix, e_u, e_i, e_a, test_pairs)
-    print("  CCR   ", {k: round(v, 3) for k, v in results["CECR (CCR)"].items() if k != "curve"})
-
+    # ---------------- RQ1 / RQ2 (Table II, Fig. 3, Fig. 4, Fig. 6d) ----------------
+    print("[RQ1/RQ2] recommendation performance + ablations", flush=True)
+    R = out["results"]
+    R["CECR (CCR)"] = eval_performance(model, d, attr_matrix, e_u, e_i, e_a, test_pairs)
+    show("CCR", R["CECR (CCR)"])
     if not args.skip_ablations:
-        results["- PreRi"] = eval_performance(model, d, attr_matrix, e_u, e_i, e_a,
-                                              test_pairs, use_pref_refine=False)
-        print("  PreRi ", {k: round(v, 3) for k, v in results["- PreRi"].items() if k != "curve"})
-
-        results["- RecPe"] = eval_performance(model, d, attr_matrix, e_u, e_i, e_a,
-                                              test_pairs, use_score_decision=False)
-        print("  RecPe ", {k: round(v, 3) for k, v in results["- RecPe"].items() if k != "curve"})
-
+        R["- PreRi"] = eval_performance(model, d, attr_matrix, e_u, e_i, e_a, test_pairs,
+                                        use_pref_refine=False)
+        show("- PreRi", R["- PreRi"])
+        R["- RecPe"] = eval_performance(model, d, attr_matrix, e_u, e_i, e_a, test_pairs,
+                                        use_score_decision=False)
+        show("- RecPe", R["- RecPe"])
         gu, gi, ga = embeddings(model, graph, "gnns_off")
-        results["- GNNs"] = eval_performance(model, d, attr_matrix, gu, gi, ga, test_pairs)
-        print("  GNNs  ", {k: round(v, 3) for k, v in results["- GNNs"].items() if k != "curve"})
+        R["- GNNs"] = eval_performance(model, d, attr_matrix, gu, gi, ga, test_pairs)
+        show("- GNNs", R["- GNNs"])
+        if os.path.exists(args.model_noucf):
+            m2 = load_model(args.model_noucf, d)
+            e_u2, e_i2, e_a2 = embeddings(m2, graph)
+            R["- CouRe"] = eval_performance(m2, d, attr_matrix, e_u2, e_i2, e_a2, test_pairs)
+            show("- CouRe", R["- CouRe"])
+    with open(f"{OUT}/cecr_table2.csv", "w") as f:
+        f.write("Model,SR@5,SR@10,SR@20,AT,ms_per_turn,sec_per_conv\n")
+        for k, v in R.items():
+            f.write(f"{k},{v['SR@5']:.4f},{v['SR@10']:.4f},{v['SR@20']:.4f},{v['AT']:.2f},"
+                    f"{v['ms_per_turn']:.2f},{v['sec_per_conv']:.4f}\n")
 
-    if not args.skip_ablations and os.path.exists(args.model_noucf):
-        m2 = load_model(args.model_noucf, d)
-        e_u2, e_i2, e_a2 = embeddings(m2, graph)
-        results["- CouRe"] = eval_performance(m2, d, attr_matrix, e_u2, e_i2, e_a2, test_pairs)
-        print("  CouRe ", {k: round(v, 3) for k, v in results["- CouRe"].items() if k != "curve"})
+    # ---------------- RQ4: Top-K (Fig. 6b, 6c) ----------------
+    if args.topk_sweep:
+        print("[RQ4] Top-K sweep (Fig. 6b/6c)", flush=True)
+        for k in (1, 5, 10, 20, 50):
+            r = eval_performance(model, d, attr_matrix, e_u, e_i, e_a, test_pairs, topk=k)
+            out["topk"].append((k, r["AT"], r["SR@20"]))
+            print(f"  K={k:>2}  AT={r['AT']:.2f}  SR@20={r['SR@20']:.3f}", flush=True)
+        with open(f"{OUT}/fig6bc_topk.csv", "w") as f:
+            f.write("K,AT,SR@20\n")
+            for k, at, sr in out["topk"]:
+                f.write(f"{k},{at:.3f},{sr:.4f}\n")
 
-    with open(f"{OUT}/table2_performance.csv", "w") as f:
-        f.write("Model,SR@5,SR@10,SR@20,AT\n")
-        for k, v in results.items():
-            f.write(f"{k},{v['SR@5']:.4f},{v['SR@10']:.4f},{v['SR@20']:.4f},{v['AT']:.2f}\n")
-
-    # ---------------- RQ3 ----------------
-    ex_cecr = ex_rand = None
+    # ---------------- RQ3 (Table IV) ----------------
     if not args.skip_expl:
-      print("[RQ3] explainability (Table IV)")
-      ex_cecr = eval_explainability(model, d, attr_matrix, e_u, e_i, e_a, test_pairs, lam=args.lam)
-    ex_rand = eval_explainability(model, d, attr_matrix, e_u, e_i, e_a, test_pairs,
-                                  lam=args.lam, random_expl=True)
-    print("  CECR ", {k: round(v, 4) for k, v in ex_cecr.items()})
-    print("  Random", {k: round(v, 4) for k, v in ex_rand.items()})
-    with open(f"{OUT}/table4_explainability.csv", "w") as f:
-        f.write("Model,Precision,Recall,PN,PS\n")
-        f.write(f"Random,{ex_rand['Precision']:.4f},{ex_rand['Recall']:.4f},"
-                f"{ex_rand['PN']:.4f},{ex_rand['PS']:.4f}\n")
-        f.write(f"CECR,{ex_cecr['Precision']:.4f},{ex_cecr['Recall']:.4f},"
-                f"{ex_cecr['PN']:.4f},{ex_cecr['PS']:.4f}\n")
+        print("[RQ3] explainability (Table IV)", flush=True)
+        states = explanation_states(d, attr_matrix, test_pairs, args.n_expl)
+        profile = liked_attr_profile(d, attr_matrix)
+        out["expl"]["CECR"] = eval_explainability(model, d, attr_matrix, e_u, e_i, e_a,
+                                                  states, profile, lam=args.lam)
+        out["expl"]["Random"] = eval_explainability(model, d, attr_matrix, e_u, e_i, e_a,
+                                                    states, profile, random_expl=True)
+        for k, v in out["expl"].items():
+            print(f"  {k:6s}", {kk: round(vv, 4) for kk, vv in v.items()}, flush=True)
+        with open(f"{OUT}/cecr_table4.csv", "w") as f:
+            f.write("Model,Precision,Recall,PN,PS,n\n")
+            for k, v in out["expl"].items():
+                f.write(f"{k},{v['Precision']:.4f},{v['Recall']:.4f},{v['PN']:.4f},"
+                        f"{v['PS']:.4f},{v['n']}\n")
 
-    # ---------------- RQ4 ----------------
-    rows = []
+    # ---------------- RQ4: lambda (Fig. 6a) ----------------
     if not args.skip_lambda:
-      print("[RQ4] lambda sensitivity (Fig. 6a)")
-      rows = eval_lambda(model, d, attr_matrix, e_u, e_i, e_a, test_pairs)
-    with open(f"{OUT}/fig6a_data.csv", "w") as f:
-        f.write("lambda,ES,EC\n")
-        for lam, es, ec in rows:
-            f.write(f"{lam},{es:.4f},{ec:.4f}\n")
+        print("[RQ4] lambda sensitivity (Fig. 6a)", flush=True)
+        out["lam"] = eval_lambda(model, d, attr_matrix, e_u, e_i, e_a, test_pairs,
+                                 lambdas=(0, 1, 6, 10, 25, 50, 75, 100))
+        with open(f"{OUT}/fig6a_lambda.csv", "w") as f:
+            f.write("lambda,ES,EC\n")
+            for lam, es, ec in out["lam"]:
+                f.write(f"{lam},{es:.4f},{ec:.4f}\n")
 
-    # ---------------- case study ----------------
+    # ---------------- case study (Fig. 5) ----------------
     if os.path.exists("data/u.item") and d.get("name") is None:
         import pandas as pd
         items = pd.read_csv("data/u.item", sep="|", encoding="latin-1", header=None)
         titles = {i: t for i, t in zip(items[0].values - 1, items[1].values)}
     else:
-        # Douban-Book ships ids only, no titles
-        titles = {i: f"item #{i}" for i in range(d["n_items"])}
-    genres = d["genre_names"]
-    txt = case_study(model, d, attr_matrix, e_u, e_i, e_a, test_pairs, titles, genres)
+        titles = {i: f"item #{i}" for i in range(d["n_items"])}   # no titles shipped
+    txt = case_study(model, d, attr_matrix, e_u, e_i, e_a, test_pairs, titles,
+                     d["genre_names"])
     with open(f"{OUT}/case_study.txt", "w", encoding="utf-8") as f:
         f.write(txt + "\n")
     print(txt)
 
-    with open(f"{OUT}/results.pkl", "wb") as f:
-        pickle.dump(dict(results=results,
-                         expl=(dict(CECR=ex_cecr, Random=ex_rand) if ex_cecr else {}),
-                         lam=rows), f)
+    with open(f"{OUT}/cecr.pkl", "wb") as f:
+        pickle.dump(out, f)
     print(f"\nAll outputs written to {OUT}/")
 
 
