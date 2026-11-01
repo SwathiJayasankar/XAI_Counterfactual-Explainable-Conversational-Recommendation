@@ -13,6 +13,8 @@ Protocol (paper Section IV-D-1 / V-A, the EAR/FPAN/UNICORN/CPR convention):
   * candidates = items carrying all accepted attributes, none of the rejected
     attributes, and not already rejected
   * at most MAX_ROUNDS = 20 rounds; SR@r and AT (failures count as 20)
+  * optional answer noise: each attribute answer is flipped with probability
+    `answer_noise` (0 by default = the paper's truthful simulator)
 
 Agent interface (duck-typed):
   begin(state)                         new conversation
@@ -72,7 +74,8 @@ def attr_entropy(attr_matrix, cands, weights=None):
     return (-(p * np.log2(p) + (1 - p) * np.log2(1 - p))).astype(np.float32)
 
 
-def run_conversation(agent, u, tgt, attr_matrix, rng, max_rounds=MAX_ROUNDS, topk=TOPK):
+def run_conversation(agent, u, tgt, attr_matrix, rng, max_rounds=MAX_ROUNDS, topk=TOPK,
+                     answer_noise=0.0):
     """One simulated conversation; returns the success round or None."""
     n_items = attr_matrix.shape[0]
     t_attrs = set(np.nonzero(attr_matrix[tgt])[0].tolist())
@@ -109,6 +112,8 @@ def run_conversation(agent, u, tgt, attr_matrix, rng, max_rounds=MAX_ROUNDS, top
             a = int(agent.pick_attr(st, cands, cand_attrs))
             st.asked.add(a)
             ok = a in t_attrs
+            if answer_noise and rng.random() < answer_noise:
+                ok = not ok                     # the user misremembers / misclicks
             (st.pos if ok else st.neg).add(a)
             st.history.append("ask_suc" if ok else "ask_fail")
             if fb:
@@ -129,19 +134,22 @@ def summarize(rounds, max_rounds=MAX_ROUNDS):
     return out
 
 
-def evaluate(agent, pairs, attr_matrix, seed=7, max_rounds=MAX_ROUNDS, topk=TOPK):
-    """SR@5/10/20, AT, the per-round SR curve, and mean response time."""
+def evaluate(agent, pairs, attr_matrix, seed=7, max_rounds=MAX_ROUNDS, topk=TOPK,
+             answer_noise=0.0):
+    """SR@5/10/20, AT, the per-round SR curve, mean response time, and the
+    per-conversation success rounds (for paired significance tests)."""
     rounds, turns, secs = [], 0, 0.0
     for idx, (u, tgt) in enumerate(pairs):
         rng = np.random.default_rng([seed, idx])
         t0 = time.perf_counter()
-        r = run_conversation(agent, u, tgt, attr_matrix, rng, max_rounds, topk)
+        r = run_conversation(agent, u, tgt, attr_matrix, rng, max_rounds, topk, answer_noise)
         secs += time.perf_counter() - t0
         turns += r if r is not None else max_rounds
         rounds.append(r)
     out = summarize(rounds, max_rounds)
     out["sec_per_conv"] = secs / max(len(pairs), 1)
     out["ms_per_turn"] = 1000 * secs / max(turns, 1)
+    out["rounds"] = rounds
     return out
 
 

@@ -1,0 +1,18 @@
+dataset=yelp  |e_i|=1.78  |e_a|=0.74  |e_u|=1.63
+  eq20           SR@5=0.374 SR@10=0.502 SR@20=0.660 AT=10.99  ask=0.01  (25.1 ms/turn)
+  cosine         SR@5=0.378 SR@10=0.504 SR@20=0.658 AT=10.94  ask=0.01  (22.8 ms/turn)
+  [imitation] 2716 decisions  val SR@20=0.650 AT=11.40
+  [REINFORCE] ep 250/3000 val SR@20=0.650 AT=11.40 ask=0.00 (201s)
+  [REINFORCE] ep 500/3000 val SR@20=0.650 AT=11.40 ask=0.00 (375s)
+  [REINFORCE] ep 750/3000 val SR@20=0.650 AT=11.40 ask=0.00 (604s)
+  [REINFORCE] ep 1000/3000 val SR@20=0.650 AT=11.40 ask=0.00 (916s)
+  [REINFORCE] ep 1250/3000 val SR@20=0.650 AT=11.40 ask=0.00 (1262s)
+  [REINFORCE] ep 1500/3000 val SR@20=0.650 AT=11.40 ask=0.00 (1496s)
+  [REINFORCE] ep 1750/3000 val SR@20=0.650 AT=11.40 ask=0.00 (1774s)
+  [REINFORCE] ep 2000/3000 val SR@20=0.650 AT=11.40 ask=0.00 (1986s)
+  [REINFORCE] ep 2250/3000 val SR@20=0.650 AT=11.40 ask=0.00 (2193s)
+  [REINFORCE] ep 2500/3000 val SR@20=0.650 AT=11.40 ask=0.00 (2396s)
+  [REINFORCE] ep 2750/3000 val SR@20=0.650 AT=11.40 ask=0.00 (2596s)
+  [REINFORCE] ep 3000/3000 val SR@20=0.650 AT=11.40 ask=0.00 (2807s)
+  policy         SR@5=0.386 SR@10=0.510 SR@20=0.658 AT=10.87  ask=0.00  (57.7 ms/turn)
+written to results/yelp/decision_results.json

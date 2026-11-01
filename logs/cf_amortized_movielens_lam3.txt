@@ -1,0 +1,12 @@
+dataset=movielens  3000 train states -> 30000 samples (47s)
+  [DeltaNet] epoch 5/30  Eq.17 loss=3.3630
+  [DeltaNet] epoch 10/30  Eq.17 loss=3.3110
+  [DeltaNet] epoch 15/30  Eq.17 loss=3.2831
+  [DeltaNet] epoch 20/30  Eq.17 loss=3.2634
+  [DeltaNet] epoch 25/30  Eq.17 loss=3.2568
+  [DeltaNet] epoch 30/30  Eq.17 loss=3.2501
+  trained in 394s
+  paper (60 Adam steps)  Pr=0.5098 Re=0.6293 PN=0.8119 PS=0.8415  ES=1.071 EC=1.14  258.50 ms/expl  (n=675)
+  DeltaNet (1 pass)      Pr=0.5431 Re=0.7154 PN=0.8904 PS=0.8974  ES=1.394 EC=1.39  5.43 ms/expl  (n=721)
+  DeltaNet + 5 steps     Pr=0.5253 Re=0.6643 PN=0.8256 PS=0.8743  ES=1.442 EC=1.59  21.63 ms/expl  (n=883)
+written to results/movielens/cf_amortized_lam3.json

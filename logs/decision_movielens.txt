@@ -1,0 +1,18 @@
+dataset=movielens  |e_i|=1.59  |e_a|=1.14  |e_u|=4.25
+  eq20           SR@5=0.696 SR@10=0.830 SR@20=0.952 AT=5.26  ask=0.00  (5.1 ms/turn)
+  cosine         SR@5=0.696 SR@10=0.830 SR@20=0.952 AT=5.26  ask=0.00  (5.4 ms/turn)
+  [imitation] 1212 decisions  val SR@20=0.980 AT=4.65
+  [REINFORCE] ep 250/3000 val SR@20=0.980 AT=4.65 ask=0.00 (14s)
+  [REINFORCE] ep 500/3000 val SR@20=0.980 AT=4.65 ask=0.00 (27s)
+  [REINFORCE] ep 750/3000 val SR@20=0.980 AT=4.65 ask=0.00 (41s)
+  [REINFORCE] ep 1000/3000 val SR@20=0.980 AT=4.65 ask=0.00 (55s)
+  [REINFORCE] ep 1250/3000 val SR@20=0.980 AT=4.65 ask=0.00 (70s)
+  [REINFORCE] ep 1500/3000 val SR@20=0.980 AT=4.65 ask=0.00 (85s)
+  [REINFORCE] ep 1750/3000 val SR@20=0.980 AT=4.65 ask=0.00 (101s)
+  [REINFORCE] ep 2000/3000 val SR@20=0.980 AT=4.65 ask=0.00 (118s)
+  [REINFORCE] ep 2250/3000 val SR@20=0.980 AT=4.65 ask=0.00 (132s)
+  [REINFORCE] ep 2500/3000 val SR@20=0.980 AT=4.65 ask=0.00 (145s)
+  [REINFORCE] ep 2750/3000 val SR@20=0.980 AT=4.65 ask=0.00 (158s)
+  [REINFORCE] ep 3000/3000 val SR@20=0.980 AT=4.65 ask=0.00 (173s)
+  policy         SR@5=0.696 SR@10=0.830 SR@20=0.952 AT=5.26  ask=0.00  (8.2 ms/turn)
+written to results/movielens/decision_results.json

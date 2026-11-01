@@ -1,0 +1,10 @@
+dataset=yelp  |e_i|=1.78  |e_a|=0.74  |e_u|=1.63
+  [threshold] T=10    val SR@20=0.870 AT=11.66 ask=0.96
+  [threshold] T=25    val SR@20=0.870 AT=10.55 ask=0.92
+  [threshold] T=50    val SR@20=0.870 AT=9.42 ask=0.88
+  [threshold] T=100   val SR@20=0.950 AT=8.31 ask=0.78
+  [threshold] T=200   val SR@20=0.950 AT=8.06 ask=0.65
+  [threshold] T=500   val SR@20=0.930 AT=8.68 ask=0.32
+  [threshold] T=1000  val SR@20=0.850 AT=9.54 ask=0.17
+  threshold T=200 SR@5=0.410 SR@10=0.708 SR@20=0.952 AT=7.95  ask=0.59  (22.3 ms/turn)
+written to results/yelp/decision_results.json

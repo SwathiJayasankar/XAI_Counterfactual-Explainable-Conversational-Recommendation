@@ -1,0 +1,10 @@
+dataset=movielens  |e_i|=1.59  |e_a|=1.14  |e_u|=4.25
+  [threshold] T=10    val SR@20=0.990 AT=8.82 ask=0.95
+  [threshold] T=25    val SR@20=0.990 AT=7.96 ask=0.92
+  [threshold] T=50    val SR@20=0.990 AT=7.09 ask=0.86
+  [threshold] T=100   val SR@20=0.990 AT=5.79 ask=0.72
+  [threshold] T=200   val SR@20=0.990 AT=5.71 ask=0.66
+  [threshold] T=500   val SR@20=1.000 AT=4.34 ask=0.18
+  [threshold] T=1000  val SR@20=0.980 AT=4.65 ask=0.00
+  threshold T=500 SR@5=0.730 SR@10=0.898 SR@20=0.982 AT=4.63  ask=0.18  (8.5 ms/turn)
+written to results/movielens/decision_results.json

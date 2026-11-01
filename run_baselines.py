@@ -9,6 +9,10 @@ dataset, through the shared harness (crs_bench.py).
 Writes results/<tag>/baselines.pkl and results/<tag>/baselines_table2.csv
 (+ baselines_table4.csv with --expl; the paper reports Table IV for Yelp and
 MovieLens only).
+
+--robust (improvement #5): test pairs and conversation seeds follow --seed, every
+model is evaluated at each --noise-levels answer-noise rate, and results go to
+results/<tag>/robust/baselines_seed<seed>.pkl as {model: {noise: result}}.
 """
 import argparse
 import copy
@@ -55,6 +59,9 @@ def main():
     ap.add_argument("--n-expl", type=int, default=100)
     ap.add_argument("--smoke", action="store_true", help="tiny budget, for testing the code")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--robust", action="store_true",
+                    help="seeded test pairs + answer-noise sweep, saved under robust/")
+    ap.add_argument("--noise-levels", default="0,0.1,0.2")
     args = ap.parse_args()
 
     torch.manual_seed(args.seed)
@@ -70,7 +77,7 @@ def main():
     am = d["attr_matrix"]
     n_users, n_items = d["n_users"], d["n_items"]
     _, _, hist = positives(d)
-    pairs = test_pairs(d, args.n_test)
+    pairs = test_pairs(d, args.n_test, seed=7 + args.seed if args.robust else 7)
     val_pairs = test_pairs(d, 100, seed=1, split="val")
     tu, ti, _ = positives(d)
     train_pairs = list(zip(tu.tolist(), ti.tolist()))
@@ -79,6 +86,23 @@ def main():
         f"test conversations={len(pairs)} budget={B}")
 
     res_path = f"{out}/baselines.pkl"
+    noise_levels = [float(x) for x in args.noise_levels.split(",")]
+    if args.robust:
+        os.makedirs(f"{out}/robust", exist_ok=True)
+        res_path = f"{out}/robust/baselines_seed{args.seed}.pkl"
+        args.expl = False
+
+    def ev(ag):
+        if not args.robust:
+            return evaluate(ag, pairs, am)
+        return {nz: evaluate(ag, pairs, am, seed=7 + args.seed, answer_noise=nz)
+                for nz in noise_levels}
+
+    def show_ev(name, r):
+        if not args.robust:
+            return show(name, r)
+        for nz, v in r.items():
+            show(f"{name}@{nz}", v)
     results = {}                      # only what this run computes
 
     def load_saved():
@@ -108,7 +132,7 @@ def main():
         log("[EAR] policy network: max-entropy pre-training + REINFORCE")
         ag = EARAgent(copy.deepcopy(fm0), am, hist, reflection=True)
         train_policy_reinforce(ag, train_pairs, am, episodes=B["rl"], seed=args.seed, log=log)
-        results["EAR"] = evaluate(ag, pairs, am); show("EAR", results["EAR"]); save()
+        results["EAR"] = ev(ag); show_ev("EAR", results["EAR"]); save()
 
     if "FPAN" in models:
         log("[FPAN] gated online-feedback adaptation + EAR policy")
@@ -117,7 +141,7 @@ def main():
         train_fpan(fm, gates, d, am, epochs=B["gate_ep"], seed=args.seed, log=log)
         ag = FPANAgent(fm, gates, am, hist)
         train_policy_reinforce(ag, train_pairs, am, episodes=B["rl"], seed=args.seed, log=log)
-        results["FPAN"] = evaluate(ag, pairs, am); show("FPAN", results["FPAN"]); save()
+        results["FPAN"] = ev(ag); show_ev("FPAN", results["FPAN"]); save()
 
     if "UNICORN" in models:
         log("[UNICORN] TransE graph pre-training + graph-based dueling double DQN")
@@ -125,7 +149,7 @@ def main():
         train_kg(kg, d, am, epochs=B["kg"], seed=args.seed, log=log)
         ag = UnicornAgent(kg, am)
         train_unicorn(ag, train_pairs, am, episodes=B["dqn"], lr=1e-3, seed=args.seed, log=log)
-        results["UNICORN"] = evaluate(ag, pairs, am); show("UNICORN", results["UNICORN"]); save()
+        results["UNICORN"] = ev(ag); show_ev("UNICORN", results["UNICORN"]); save()
 
     if "KBRD" in models:
         log("[KBRD] R-GCN knowledge-graph recommender")
@@ -138,10 +162,14 @@ def main():
             if best is None or r["AT"] < best[1]:
                 best = (tau, r["AT"])
         log(f"  chosen tau={best[0]}")
-        results["KBRD"] = evaluate(KBRDAgent(kb, am, hist, tau=best[0]), pairs, am)
-        results["KBRD"]["tau"] = best[0]
-        show("KBRD", results["KBRD"]); save()
+        results["KBRD"] = ev(KBRDAgent(kb, am, hist, tau=best[0]))
+        if not args.robust:
+            results["KBRD"]["tau"] = best[0]
+        show_ev("KBRD", results["KBRD"]); save()
 
+    if args.robust:
+        log(f"done in {time.time()-t_all:.0f}s -> {res_path}")
+        return
     all_res = {**load_saved(), **results}
     with open(f"{out}/baselines_table2.csv", "w") as f:
         f.write("Model,SR@5,SR@10,SR@20,AT,ms_per_turn,sec_per_conv\n")

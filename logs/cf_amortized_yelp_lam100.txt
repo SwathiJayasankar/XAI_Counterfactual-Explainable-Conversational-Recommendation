@@ -1,0 +1,12 @@
+dataset=yelp  3000 train states -> 30000 samples (51s)
+  [DeltaNet] epoch 5/30  Eq.17 loss=10.6477
+  [DeltaNet] epoch 10/30  Eq.17 loss=8.9086
+  [DeltaNet] epoch 15/30  Eq.17 loss=7.7635
+  [DeltaNet] epoch 20/30  Eq.17 loss=7.7133
+  [DeltaNet] epoch 25/30  Eq.17 loss=7.6854
+  [DeltaNet] epoch 30/30  Eq.17 loss=7.6722
+  trained in 753s
+  paper (60 Adam steps)  Pr=0.4378 Re=0.8105 PN=0.9409 PS=0.9449  ES=6.708 EC=3.35  193.59 ms/expl  (n=999)
+  DeltaNet (1 pass)      Pr=0.4629 Re=0.7714 PN=0.9240 PS=0.9150  ES=5.368 EC=2.98  5.75 ms/expl  (n=1000)
+  DeltaNet + 5 steps     Pr=0.4521 Re=0.7941 PN=0.9350 PS=0.9260  ES=5.458 EC=3.17  18.02 ms/expl  (n=1000)
+written to results/yelp/cf_amortized_lam100.json
