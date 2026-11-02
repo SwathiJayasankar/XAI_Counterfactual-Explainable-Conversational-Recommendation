@@ -148,7 +148,6 @@ Tested with **Python 3.11** on **CPU only** (Windows 11 and Linux). No GPU is ne
 ```bash
 git clone https://github.com/SwathiJayasankar/XAI_Counterfactual-Explainable-Conversational-Recommendation.git
 cd XAI_Counterfactual-Explainable-Conversational-Recommendation
-git checkout improvements          # the Phase 2 extensions live on this branch
 
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
